@@ -32,9 +32,12 @@ public class HBaseBlobStoreConnection implements BlobStoreConnection {
     public HBaseBlobStoreConnection(HBaseBlobStore store,String tableName) {
         super();
         try {
-            this.table = getTable(tableName);
             this.config = HBaseConfiguration.create();
-            this.admin = new HBaseAdmin(config);
+            this.config.set("hbase.zookeeper.quorum", "localhost");
+            this.config.set("hbase.zookeeper.property.clientPort", "2181");
+            this.config.set("hbase.master","localhost:60000");
+            this.admin = new HBaseAdmin(this.config);
+            this.table = getTable(tableName);
         }catch(IOException e) {
             throw new RuntimeException(e.getLocalizedMessage(),e);
         }
@@ -95,8 +98,7 @@ public class HBaseBlobStoreConnection implements BlobStoreConnection {
     }
 
     public Iterator<URI> listBlobIds(String arg0) throws IOException {
-        // TODO Auto-generated method stub
-        return null;
+        return new HBaseIdIterator(getTable(), store.getId());
     }
 
     public void sync() throws IOException, UnsupportedOperationException {
