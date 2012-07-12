@@ -15,9 +15,11 @@ import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.metrics.HBaseInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class HBaseBlob implements Blob {
-    
+    private static final Logger log=LoggerFactory.getLogger(HBaseBlob.class);
     
     private final HBaseBlobStoreConnection conn;
     private final URI id;
@@ -29,14 +31,17 @@ public class HBaseBlob implements Blob {
         this.conn = conn;
         this.id=id;
         this.get=new Get(id.toASCIIString().getBytes());
+        System.out.println("created Blob " + id.toASCIIString());
     }
 
     public void delete() throws IOException {
+        System.out.println("deleting blob " + id.toASCIIString());
         Delete del=new Delete(id.toASCIIString().getBytes());
         this.conn.getTable().delete(del);
     }
 
     public boolean exists() throws IOException {
+        System.out.println("checking existance of blob " + id.toASCIIString());
         return this.conn.getTable().exists(get);
     }
 
@@ -53,11 +58,16 @@ public class HBaseBlob implements Blob {
     }
 
     public long getSize() throws IOException, MissingBlobException {
-        return this.conn.getTable().get(get).getValue(HBaseBlobStore.DATA_FAMILY, HBaseBlobStore.DEFAULT_QUALIFIER).length;
+        byte[] val= this.conn.getTable().get(get).getValue(HBaseBlobStore.DATA_FAMILY, HBaseBlobStore.DEFAULT_QUALIFIER);
+        if (val == null) {
+            throw new MissingBlobException(id);
+        }
+        return val.length;
     }
 
     public Blob moveTo(URI arg0, Map<String, String> arg1) throws DuplicateBlobException, IOException, MissingBlobException, NullPointerException,
             IllegalArgumentException {
+        System.out.println("moving blob " + id.toASCIIString());
         HBaseBlob moved=new HBaseBlob(this.conn,arg0);
         OutputStream os=null;
         InputStream is=null;
@@ -74,10 +84,16 @@ public class HBaseBlob implements Blob {
     }
 
     public InputStream openInputStream() throws IOException, MissingBlobException {
-        return new ByteArrayInputStream(this.conn.getTable().get(get).getValue(HBaseBlobStore.DATA_FAMILY, HBaseBlobStore.DEFAULT_QUALIFIER));
+        System.out.println("readin blob " + id.toASCIIString());
+        byte[] data=this.conn.getTable().get(get).getValue(HBaseBlobStore.DATA_FAMILY, HBaseBlobStore.DEFAULT_QUALIFIER);
+        if (data == null) {
+            data = new byte[0];
+        }
+        return new ByteArrayInputStream(data);
     }
 
     public OutputStream openOutputStream(long arg0, boolean arg1) throws IOException, DuplicateBlobException {
+        System.out.println("writing blob " + id.toASCIIString());
         return new HBaseOutputStream(this.conn.getTable(),id.toASCIIString().getBytes());
     }
 

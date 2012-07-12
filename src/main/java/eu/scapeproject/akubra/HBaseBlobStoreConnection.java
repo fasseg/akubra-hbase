@@ -15,8 +15,8 @@ import org.akubraproject.UnsupportedIdException;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.HColumnDescriptor;
 import org.apache.hadoop.hbase.HTableDescriptor;
-import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HTable;
 
@@ -33,10 +33,11 @@ public class HBaseBlobStoreConnection implements BlobStoreConnection {
         super();
         try {
             this.config = HBaseConfiguration.create();
-            this.config.set("hbase.zookeeper.quorum", "localhost");
-            this.config.set("hbase.zookeeper.property.clientPort", "2181");
-            this.config.set("hbase.master","localhost:60000");
+            this.config.clear();
+            this.config.set("hbase.zookeeper.quorum", "127.0.0.1");
+            System.out.println("getting admin connection for " + tableName);
             this.admin = new HBaseAdmin(this.config);
+            System.out.println("getting table");
             this.table = getTable(tableName);
         }catch(IOException e) {
             throw new RuntimeException(e.getLocalizedMessage(),e);
@@ -63,8 +64,10 @@ public class HBaseBlobStoreConnection implements BlobStoreConnection {
             throw new IOException("connection is closed");
         }
         try {
-            if (admin.tableExists(name)) {
+            if (!admin.tableExists(name)) {
                 HTableDescriptor desc = new HTableDescriptor(name);
+                HColumnDescriptor colDesc=new HColumnDescriptor(HBaseBlobStore.DATA_FAMILY);
+                desc.addFamily(colDesc);
                 admin.createTable(desc);
             }
             return new HTable(config, name);
@@ -79,6 +82,7 @@ public class HBaseBlobStoreConnection implements BlobStoreConnection {
 
     public Blob getBlob(InputStream is, long arg1, Map<String, String> arg2) throws IOException, UnsupportedOperationException {
         HBaseBlob blob=new HBaseBlob(this,URI.create(this.store.getId().toASCIIString() + "/" + UUID.randomUUID().toString()));
+        System.out.println("creating new blob " + blob.getId().toASCIIString());
         OutputStream os=null;
         try {
             os = blob.openOutputStream(arg1, false);
